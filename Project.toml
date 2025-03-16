@@ -1,0 +1,11 @@
+name = "NGSpiceTools"
+uuid = "fcf7cca8-e456-49bb-9773-5930c49c875a"
+authors = ["pouyan <pouyank13@me.com>"]
+version = "0.1.0"
+
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+OhMyREPL = "5fb14364-9ced-5910-84b2-373655c76a03"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

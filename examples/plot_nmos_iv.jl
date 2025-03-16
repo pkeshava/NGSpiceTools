@@ -1,0 +1,55 @@
+using NGSpiceTools
+using Plots
+using Printf
+"""
+This script demonstrates how to parse and plot IV curves from NGSpice data
+that contains multiple VGS sweeps. It uses the specific functions designed 
+to handle the multi-block format that ngspice produces.
+"""
+
+# Path to the data file
+data_file = "./examples/sp_data/nmos_iv_data.txt"
+
+# Simple approach - parse and plot in one step
+println("Parsing and plotting IV curves...")
+plt = parse_and_plot_iv_curves(data_file, 
+                              title="IV Characteristics (65nm PTM)",
+                              is_nmos=true)
+
+# Save the figure
+savefig(plt, "nmos_iv_family_curves.png")
+println("Plot saved to nmos_iv_family_curves.png")
+
+# Display some information about the IV curves
+data = parse_ngspice_iv_curves(data_file, is_nmos=true)
+vgs_values = data["vgs_values"]
+ids_matrix = data["ids"]
+
+println("\nMOSFET IV Curve Analysis")
+println("------------------------")
+println("Device type: NMOS")
+println("Number of VGS values: $(length(vgs_values))")
+println("VGS values: $vgs_values")
+
+# Calculate maximum current for each VGS
+println("\nVGS (V) | Max IDS (A)")
+println("--------|------------")
+for i in 1:length(vgs_values)
+    ids_column = ids_matrix[:, i]
+    max_current = maximum(filter(!isnan, ids_column))
+    println(@sprintf("%.1f      | %.4e", vgs_values[i], max_current))
+end
+
+# More advanced usage - if you want to customize the plot further
+plt2 = plot_iv_family_curves(data, title="NMOS IV Characteristics (65nm PTM)")
+xlabel!("Drain Voltage (V)")
+ylabel!("Drain Current (A)")
+plot!(size=(800, 600))  # Adjust plot size
+plot!(dpi=300)  # High resolution for publishing
+savefig(plt2, "nmos_iv_curves_advanced.png")
+println("\nEnhanced plot saved to nmos_iv_curves_advanced.png")
+
+# If you want to display the plot interactively (in a GUI window)
+if isinteractive()
+    display(plt2)
+end
