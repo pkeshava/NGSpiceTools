@@ -7,6 +7,9 @@ that contains multiple VGS sweeps. It uses the specific functions designed
 to handle the multi-block format that ngspice produces.
 """
 
+simulate_vds_vgs_ids("./examples/sp_and_data/nmos_iv.sp")
+
+
 # Path to the data file
 data_file = "./examples/sp_and_data/nmos_iv_data.txt"
 

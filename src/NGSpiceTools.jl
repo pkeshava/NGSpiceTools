@@ -1,6 +1,8 @@
 module NGSpiceTools
 
 export NGSpiceResult
+
+export simulate_vds_vgs_ids
 export parse_ngspice_iv_curves, plot_iv_family_curves, parse_and_plot_iv_curves
 
 export simulate_vgs_sweep, parse_and_plot_vgs_id, extract_vgs_id_data
