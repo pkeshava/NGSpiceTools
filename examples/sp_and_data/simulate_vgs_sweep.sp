@@ -18,7 +18,7 @@ Vbs bulk source DC 0
   run
   set wr_vecnames
   set wr_singlescale
-  wrdata ./examples/sp_and_data/vgs_id_data.txt v(gate) i(Vds)
+  wrdata ./examples/sp_and_data/simulate_vgs_sweep.txt v(gate) i(Vds)
   quit
 .endc
 
