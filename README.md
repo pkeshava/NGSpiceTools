@@ -17,6 +17,8 @@ julia --project=. -e 'using Pkg; Pkg.test(coverage=true)
 
 ## Todo
 
+- [ ] Come up with an actual detailed plan for features
+- [ ] Make plotting interactive and savable... with latex labels
 - [ ] AC analysis of simple amplifier stages
 - [ ] Incorporate more spice models in examples
 - [ ] Work on automatic testing...

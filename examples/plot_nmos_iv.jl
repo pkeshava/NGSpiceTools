@@ -8,7 +8,7 @@ to handle the multi-block format that ngspice produces.
 """
 
 # Path to the data file
-data_file = "./examples/sp_data/nmos_iv_data.txt"
+data_file = "./examples/sp_and_data/nmos_iv_data.txt"
 
 # Simple approach - parse and plot in one step
 println("Parsing and plotting IV curves...")
@@ -49,7 +49,14 @@ plot!(dpi=300)  # High resolution for publishing
 savefig(plt2, "nmos_iv_curves_advanced.png")
 println("\nEnhanced plot saved to nmos_iv_curves_advanced.png")
 
-# If you want to display the plot interactively (in a GUI window)
-if isinteractive()
-    display(plt2)
-end
+data_file_pmos = "./examples/sp_and_data/pmos_iv_data.txt"
+plt_pmos = parse_and_plot_iv_curves(data_file_pmos, 
+                              title="PMOS IV Characteristics (65nm PTM)",
+                              is_nmos=false)
+
+#%% Vgs ID sweep
+
+simulate_vgs_sweep("./examples/sp_and_data/simulate_vgs_sweep.sp")
+
+vgs_id_dict = extract_vgs_id_data("./examples/sp_and_data/vgs_id_data.txt")
+plt = parse_and_plot_vgs_id("./examples/sp_and_data/vgs_id_data.txt")
