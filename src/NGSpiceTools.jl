@@ -5,14 +5,10 @@ export SimulationType, DeviceType
 export DC_SWEEP, AC_ANALYSIS, TRANSIENT, OPERATING_POINT, TRANSFER_CURVE, IV_CURVE
 export NMOS, PMOS, RESISTOR, CAPACITOR, INDUCTOR, BJT, DIODE, OTHER
 export run_simulation, read_simulation_output
-export parse_iv_curve_data, parse_transfer_curve_data
-export plot_iv_family_curves, plot_transfer_curve
-export extract_parameters
 export create_simulation, simulate_iv_curves, simulate_transfer_curve
-export modify_spice_parameter
+export plot_iv_family_curves, plot_transfer_curve
 
 using Plots
-using DelimitedFiles
 
 """
     SimulationType
@@ -85,37 +81,86 @@ struct NGSpiceSimulation
 end
 
 """
-    run_simulation(simulation::NGSpiceSimulation; modify_file::Bool=false)
+    create_simulation(;
+        spice_file::String,
+        output_file::String="",
+        simulation_type::SimulationType=DC_SWEEP,
+        device_type::DeviceType=OTHER,
+        parameters::Dict{String, Any}=Dict{String, Any}()
+    ) -> NGSpiceSimulation
+
+Create an NGSpiceSimulation object with the specified parameters.
+
+# Arguments
+- `spice_file::String`: Path to the NGSpice input file (.sp)
+- `output_file::String`: Path where simulation output should be saved (inferred from spice_file if empty)
+- `simulation_type::SimulationType`: Type of simulation to perform
+- `device_type::DeviceType`: Type of device being simulated
+- `parameters::Dict{String, Any}`: Simulation parameters
+
+# Returns
+- `NGSpiceSimulation`: Configured simulation object
+"""
+function create_simulation(;
+    spice_file::String,
+    output_file::String="",
+    simulation_type::SimulationType=DC_SWEEP,
+    device_type::DeviceType=OTHER,
+    parameters::Dict{String, Any}=Dict{String, Any}()
+) :: NGSpiceSimulation
+    
+    # If output file not specified, infer from spice file name
+    if isempty(output_file)
+        # Get directory and base name
+        dir_path = dirname(spice_file)
+        base_name = splitext(basename(spice_file))[1]
+        
+        # Create output file path in the same directory
+        if simulation_type == IV_CURVE
+            output_file = joinpath(dir_path, "$(base_name)_data.txt")
+        elseif simulation_type == TRANSFER_CURVE
+            output_file = joinpath(dir_path, "vgs_id_data.txt")  # Default for transfer curves
+        else
+            output_file = joinpath(dir_path, "$(base_name)_output.txt")
+        end
+    end
+    
+    return NGSpiceSimulation(
+        spice_file,
+        output_file,
+        simulation_type,
+        device_type,
+        parameters
+    )
+end
+
+"""
+    run_simulation(simulation::NGSpiceSimulation; modify_file::Bool=false, working_dir::String="")
 
 Run an NGSpice simulation with the given configuration.
 
 # Arguments
 - `simulation::NGSpiceSimulation`: The simulation configuration
 - `modify_file::Bool=false`: Whether to modify the spice file before running
+- `working_dir::String=""`: Working directory for the simulation
 
 # Returns
 - `Bool`: True if simulation completed successfully
 """
 function run_simulation(simulation::NGSpiceSimulation; modify_file::Bool=false, working_dir::String="")
-    if modify_file
-        # This is a placeholder for future implementation of spice file modification
-        # modify_spice_file(simulation)
-    end
-
-    try
-        # Use the specified working directory or extract from spice file path
-        if isempty(working_dir)
-            working_dir = dirname(simulation.spice_file)
-            if isempty(working_dir) || working_dir == "."
-                working_dir = pwd()
-            end
+    # Use the specified working directory or extract from spice file path
+    if isempty(working_dir)
+        working_dir = dirname(simulation.spice_file)
+        if isempty(working_dir) || working_dir == "."
+            working_dir = pwd()
         end
-        
-        # Use just the filename when calling ngspice from the working directory
-        spice_filename = basename(simulation.spice_file)
-        
+    end
+    
+    # Use just the filename when calling ngspice from the working directory
+    spice_filename = basename(simulation.spice_file)
+    
+    try
         # Change to the working directory before running ngspice
-        current_dir = pwd()
         cd(working_dir) do
             # Run ngspice with just the filename since we're already in the correct directory
             cmd = `ngspice -b $spice_filename`
@@ -534,133 +579,6 @@ function plot_transfer_curve(result::NGSpiceResult;
 end
 
 """
-    extract_parameters(result::NGSpiceResult) -> Dict{String, Any}
-
-Extract device parameters from simulation results.
-
-# Arguments
-- `result::NGSpiceResult`: Simulation results
-
-# Returns
-- `Dict{String, Any}`: Dictionary of extracted parameters
-"""
-function extract_parameters(result::NGSpiceResult)
-    parameters = Dict{String, Any}()
-    
-    if result.simulation_type == TRANSFER_CURVE
-        # Extract threshold voltage, transconductance, etc. from transfer curve
-        vgs = result.data["Vgs"]
-        id = result.data["Id"]
-        
-        # Simple threshold voltage extraction (very basic)
-        # A more sophisticated extraction would use extrapolation in the linear region
-        sqrt_id = sqrt.(id)
-        max_slope_idx = argmax(diff(sqrt_id) ./ diff(vgs))
-        slope = (sqrt_id[max_slope_idx+1] - sqrt_id[max_slope_idx]) / (vgs[max_slope_idx+1] - vgs[max_slope_idx])
-        intercept = sqrt_id[max_slope_idx] - slope * vgs[max_slope_idx]
-        vt = -intercept / slope
-        
-        parameters["threshold_voltage"] = vt
-        
-        # Calculate transconductance (gm = dId/dVgs)
-        if length(vgs) > 1
-            gm = diff(id) ./ diff(vgs)
-            parameters["max_transconductance"] = maximum(gm)
-        end
-    elseif result.simulation_type == IV_CURVE
-        # Extract parameters from IV curves (like output resistance)
-        vds_matrix = result.metadata["vds_matrix"]
-        ids_matrix = result.metadata["ids_matrix"]
-        
-        # Calculate output resistance at each VGS (ro = dVds/dIds)
-        output_resistance = Float64[]
-        
-        for i in 1:size(ids_matrix, 2)
-            valid_indices = .!isnan.(vds_matrix[:, i])
-            
-            if sum(valid_indices) > 10  # Need enough points for a good estimate
-                vds = vds_matrix[valid_indices, i]
-                ids = ids_matrix[valid_indices, i]
-                
-                # Look at the saturation region (last third of the curve)
-                start_idx = max(1, Integer(floor(length(vds) * 2/3)))
-                
-                if start_idx < length(vds)
-                    # Estimate output resistance from the slope in saturation
-                    saturation_slope = (ids[end] - ids[start_idx]) / (vds[end] - vds[start_idx])
-                    if saturation_slope != 0
-                        ro = 1 / saturation_slope
-                        push!(output_resistance, ro)
-                    end
-                end
-            end
-        end
-        
-        if !isempty(output_resistance)
-            parameters["output_resistance"] = output_resistance
-        end
-    end
-    
-    return parameters
-end
-
-"""
-    create_simulation(;
-        spice_file::String,
-        output_file::String="",
-        simulation_type::SimulationType=DC_SWEEP,
-        device_type::DeviceType=OTHER,
-        parameters::Dict{String, Any}=Dict{String, Any}()
-    ) -> NGSpiceSimulation
-
-Create an NGSpiceSimulation object with the specified parameters.
-
-# Arguments
-- `spice_file::String`: Path to the NGSpice input file (.sp)
-- `output_file::String`: Path where simulation output should be saved (inferred from spice_file if empty)
-- `simulation_type::SimulationType`: Type of simulation to perform
-- `device_type::DeviceType`: Type of device being simulated
-- `parameters::Dict{String, Any}`: Simulation parameters
-
-# Returns
-- `NGSpiceSimulation`: Configured simulation object
-"""
-function create_simulation(;
-    spice_file::String,
-    output_file::String="",
-    simulation_type::SimulationType=DC_SWEEP,
-    device_type::DeviceType=OTHER,
-    parameters::Dict{String, Any}=Dict{String, Any}()
-) :: NGSpiceSimulation
-    
-    # If output file not specified, infer from spice file name
-    if isempty(output_file)
-        # Get directory and base name
-        dir_path = dirname(spice_file)
-        base_name = splitext(basename(spice_file))[1]
-        
-        # Create output file path in the same directory
-        if simulation_type == IV_CURVE
-            output_file = joinpath(dir_path, "$(base_name)_data.txt")
-        elseif simulation_type == TRANSFER_CURVE
-            output_file = joinpath(dir_path, "$(base_name)_data.txt")
-        else
-            output_file = joinpath(dir_path, "$(base_name)_output.txt")
-        end
-    end
-    
-    return NGSpiceSimulation(
-        spice_file,
-        output_file,
-        simulation_type,
-        device_type,
-        parameters
-    )
-end
-
-# Convenience functions for specific simulation types
-
-"""
     simulate_iv_curves(spice_file::String; 
                       device_type::DeviceType=NMOS,
                       output_file::String="",
@@ -788,65 +706,6 @@ function simulate_transfer_curve(spice_file::String;
     end
     
     return read_simulation_output(simulation)
-end
-
-"""
-    modify_spice_parameter(spice_file::String, parameter::String, value::Any; output_file::String="")
-
-Modify a parameter in a spice file and save it to a new file if output_file is specified.
-
-# Arguments
-- `spice_file::String`: Path to the original NGSpice input file (.sp)
-- `parameter::String`: The parameter to modify (e.g., "W", "L", "VDD")
-- `value::Any`: The new value for the parameter
-- `output_file::String`: Path where modified file should be saved (modifies original if empty)
-
-# Returns
-- `String`: Path to the modified file
-"""
-function modify_spice_parameter(spice_file::String, parameter::String, value::Any; output_file::String="")
-    if !isfile(spice_file)
-        error("Spice file not found: $spice_file")
-    end
-    
-    # If no output file specified, modify the original
-    if isempty(output_file)
-        output_file = spice_file
-    end
-    
-    # Read original file
-    lines = readlines(spice_file)
-    modified = false
-    
-    # Process lines and modify the parameter
-    # This is a simple implementation - a more robust one would need pattern matching based on the parameter
-    for i in 1:length(lines)
-        line = lines[i]
-        
-        # Check if this line contains the parameter
-        # Format can vary - this is a simplistic approach
-        if occursin(parameter, line) && (occursin("=", line) || occursin(" ", line))
-            # Simple replacement - in real use, this would need to be more sophisticated
-            pattern = Regex("\\b$parameter\\s*=\\s*[\\w.-]+")
-            if occursin(pattern, line)
-                lines[i] = replace(line, pattern => "$parameter=$value")
-                modified = true
-            end
-        end
-    end
-    
-    if !modified
-        @warn "Parameter $parameter not found or could not be modified in $spice_file"
-    end
-    
-    # Write to output file
-    open(output_file, "w") do f
-        for line in lines
-            println(f, line)
-        end
-    end
-    
-    return output_file
 end
 
 end # module

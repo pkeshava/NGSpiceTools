@@ -11,13 +11,6 @@ nmos_result = simulate_iv_curves("nmos_iv.sp",
 
 # Plot the IV curves
 nmos_plot = plot_iv_family_curves(nmos_result, title="NMOS Output Characteristics")
-display(nmos_plot)
-
-# Extract device parameters
-nmos_params = extract_parameters(nmos_result)
-if haskey(nmos_params, "output_resistance")
-    println("NMOS Output Resistance Values: ", nmos_params["output_resistance"])
-end
 
 println("\nRunning PMOS IV curve simulation...")
 pmos_result = simulate_iv_curves("pmos_iv.sp", 
@@ -38,16 +31,6 @@ transfer_result = simulate_transfer_curve("simulate_vgs_sweep.sp",
 linear_plot = plot_transfer_curve(transfer_result, title="NMOS Transfer Characteristic")
 
 log_plot = plot_transfer_curve(transfer_result, title="NMOS Transfer Characteristic (Log Scale)", scale=:log)
-display(log_plot)
-
-# Extract threshold voltage
-vt_params = extract_parameters(transfer_result)
-if haskey(vt_params, "threshold_voltage")
-    println("Threshold Voltage: ", vt_params["threshold_voltage"], " V")
-end
-if haskey(vt_params, "max_transconductance")
-    println("Maximum Transconductance: ", vt_params["max_transconductance"], " S")
-end
 
 println("\nAlternatively, read existing transfer curve data without running a new simulation:")
 # To read an existing data file without running a simulation

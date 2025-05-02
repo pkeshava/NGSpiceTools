@@ -25,3 +25,5 @@ Manifest.toml
 *.cov
 *.DS_Store
 *.log
+.Conda*
+*.csv
