@@ -1,0 +1,5 @@
+[deps]
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+SciMLOperators = "c0aeaf25-5076-4817-a8d5-81caf7dfa961"
+StochasticDiffEq = "789caeaf-c7a9-5a7d-9973-96adeb23e2a0"
